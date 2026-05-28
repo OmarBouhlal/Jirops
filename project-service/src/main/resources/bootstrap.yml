@@ -1,0 +1,10 @@
+# project-service/src/main/resources/bootstrap.yml
+spring:
+  application:
+    name: project-service
+  config:
+    import: configserver:http://config-server:8888
+  cloud:
+    config:
+      uri: http://config-server:8888
+      fail-fast: true
