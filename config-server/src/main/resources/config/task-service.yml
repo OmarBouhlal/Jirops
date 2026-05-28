@@ -1,0 +1,25 @@
+# config-server/src/main/resources/config/task-service.yml
+server:
+  port: 8084
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://mongo-task:27017/taskdb
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0
