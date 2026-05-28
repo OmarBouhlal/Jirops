@@ -26,6 +26,7 @@ app:
       task-status-changed: task.status_changed
       project-deleted: project.deleted
       sprint-completed: sprint.completed
+      uri: mongodb://mongo-task:27017/taskdb
 
 eureka:
   client:

@@ -23,6 +23,7 @@
         <module>eureka-server</module>
         <module>api-gateway</module>
         <module>auth-service</module>
+        <module>jwt-commons</module>
         <module>project-service</module>
         <module>task-service</module>
         <module>planning-service</module>
