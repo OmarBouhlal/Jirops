@@ -155,6 +155,23 @@ services:
     networks:
       - jira-net
 
+  task-service:
+    build:
+      context: .
+      dockerfile: task-service/Dockerfile
+    container_name: task-service
+    depends_on:
+      config-server:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      mongodb:
+        condition: service_started
+    ports:
+      - "8084:8084"
+    networks:
+      - jira-net
+
 networks:
   jira-net:
     driver: bridge
