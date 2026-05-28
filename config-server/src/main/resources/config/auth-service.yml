@@ -1,0 +1,38 @@
+# config-server/src/main/resources/config/auth-service.yml
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres-auth:5432/authdb
+    username: authuser
+    password: authpass
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0
+
+jwt:
+  secret: 3UF1LdIaPO3xV8HNRvMxCjlfeqJcfo8v9fdJd8/JE8+3F5c6dPqX/F+Pxr0GoLDLsC+IEjzJRMp4FzqTnkC9CA==
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000

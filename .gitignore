@@ -1,15 +1,40 @@
+# .gitignore
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Maven ###
+.mvn/timing.properties
+
+### Java ###
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
+out/
 
-### Mac/Windows OS ###
+### VS Code ###
+.vscode/
+
+### Eclipse / STS ###
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+### OS ###
 .DS_Store
 Thumbs.db
+
+### Docker / local env ###
+.env
+docker-compose.override.yml
