@@ -1,6 +1,5 @@
 package com.jiraclone.task.config;
 
-import com.jiraclone.task.security.GatewayHeaderAuthenticationFilter;
 import com.jirops.jwt.GatewayHeaderAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
