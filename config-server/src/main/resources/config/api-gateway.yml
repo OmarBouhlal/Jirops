@@ -28,6 +28,10 @@ spring:
           uri: lb://planning-service
           predicates:
             - Path=/sprints/**
+        - id: task-service
+          uri: lb://task-service
+          predicates:
+            - Path=/tasks/**
 
 eureka:
   client:
