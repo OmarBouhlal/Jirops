@@ -8,12 +8,28 @@ spring:
     username: projectuser
     password: projectpass
     driver-class-name: org.postgresql.Driver
+  kafka:
+    bootstrap-servers: kafka:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
   flyway:
     enabled: true
+
+app:
+  kafka:
+    topics:
+      project-created: project.created
+      project-deleted: project.deleted
+
+jwt:
+  secret: 3UF1LdIaPO3xV8HNRvMxCjlfeqJcfo8v9fdJd8/JE8+3F5c6dPqX/F+Pxr0GoLDLsC+IEjzJRMp4FzqTnkC9CA==
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000
 
 eureka:
   client:
