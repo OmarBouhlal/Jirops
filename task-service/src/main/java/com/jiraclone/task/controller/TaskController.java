@@ -6,7 +6,7 @@ import com.jiraclone.task.dto.CreateTaskRequest;
 import com.jiraclone.task.dto.TaskResponse;
 import com.jiraclone.task.dto.UpdateTaskRequest;
 import com.jiraclone.task.dto.UpdateTaskStatusRequest;
-import com.jiraclone.task.security.GatewayHeaderAuthenticationFilter;
+import com.jirops.jwt.GatewayHeaderAuthenticationFilter;
 import com.jiraclone.task.service.TaskService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
