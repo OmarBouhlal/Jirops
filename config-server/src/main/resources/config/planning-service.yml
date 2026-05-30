@@ -8,12 +8,37 @@ spring:
     username: planninguser
     password: planningpass
     driver-class-name: org.postgresql.Driver
+  kafka:
+    bootstrap-servers: kafka:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: planning-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.jiraclone.*
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.jiraclone.planning.event.TaskStatusChangedEvent
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
   flyway:
     enabled: true
+
+app:
+  kafka:
+    topics:
+      sprint-started: sprint.started
+      sprint-completed: sprint.completed
+      task-status-changed: task.status_changed
+
+jwt:
+  secret: 3UF1LdIaPO3xV8HNRvMxCjlfeqJcfo8v9fdJd8/JE8+3F5c6dPqX/F+Pxr0GoLDLsC+IEjzJRMp4FzqTnkC9CA==
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000
 
 eureka:
   client:

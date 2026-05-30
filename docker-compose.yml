@@ -172,6 +172,44 @@ services:
     networks:
       - jira-net
 
+  project-service:
+    build:
+      context: .
+      dockerfile: project-service/Dockerfile
+    container_name: project-service
+    depends_on:
+      postgres-project:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    networks:
+      - jira-net
+
+  planning-service:
+    build:
+      context: .
+      dockerfile: planning-service/Dockerfile
+    container_name: planning-service
+    depends_on:
+      postgres-planning:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    networks:
+      - jira-net
+
   task-service:
     build:
       context: .
