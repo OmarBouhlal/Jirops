@@ -155,6 +155,23 @@ services:
     networks:
       - jira-net
 
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    networks:
+      - jira-net
+
   task-service:
     build:
       context: .

@@ -49,3 +49,8 @@ management:
   tracing:
     sampling:
       probability: 1.0
+
+jwt:
+  secret: 3UF1LdIaPO3xV8HNRvMxCjlfeqJcfo8v9fdJd8/JE8+3F5c6dPqX/F+Pxr0GoLDLsC+IEjzJRMp4FzqTnkC9CA==
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000
