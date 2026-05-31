@@ -1,12 +1,16 @@
 package com.jiraclone.task.service;
 
 import com.jiraclone.task.domain.TaskDocument;
+import com.jiraclone.task.domain.TaskComment;
 import com.jiraclone.task.domain.TaskPriority;
 import com.jiraclone.task.domain.TaskStatus;
+import com.jiraclone.task.dto.AddAttachmentRequest;
 import com.jiraclone.task.dto.AddCommentRequest;
 import com.jiraclone.task.dto.CreateTaskRequest;
+import com.jiraclone.task.dto.UpdateTaskRequest;
 import com.jiraclone.task.event.TaskCreatedEvent;
 import com.jiraclone.task.event.TaskStatusChangedEvent;
+import com.jiraclone.task.exception.TaskNotFoundException;
 import com.jiraclone.task.kafka.TaskEventPublisher;
 import com.jiraclone.task.repository.TaskRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +23,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,7 +93,70 @@ class TaskServiceTest {
         );
 
         assertEquals(List.of(task), result);
-        verify(mongoTemplate).find(any(Query.class), eq(TaskDocument.class));
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(TaskDocument.class));
+        String query = queryCaptor.getValue().getQueryObject().toString();
+        assertTrue(query.contains("projectId=project-1"));
+        assertTrue(query.contains("status=IN_PROGRESS"));
+        assertTrue(query.contains("priority=HIGH"));
+        assertTrue(query.contains("assignee=user-2"));
+        assertTrue(query.contains("labels=backend"));
+    }
+
+    @Test
+    void searchTasksWithoutFiltersReturnsAllTasks() {
+        TaskDocument task = task("task-1", TaskStatus.TODO);
+        when(mongoTemplate.find(any(Query.class), eq(TaskDocument.class))).thenReturn(List.of(task));
+
+        List<TaskDocument> result = taskService.searchTasks(null, null, null, " ", "");
+
+        assertEquals(List.of(task), result);
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(TaskDocument.class));
+        assertTrue(queryCaptor.getValue().getQueryObject().isEmpty());
+    }
+
+    @Test
+    void getTaskReturnsExistingTask() {
+        TaskDocument task = task("task-1", TaskStatus.TODO);
+        when(taskRepository.findById("task-1")).thenReturn(Optional.of(task));
+
+        assertSame(task, taskService.getTask("task-1"));
+    }
+
+    @Test
+    void getTaskThrowsWhenMissing() {
+        when(taskRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertThrows(TaskNotFoundException.class, () -> taskService.getTask("missing"));
+    }
+
+    @Test
+    void updateTaskAppliesOnlyProvidedFields() {
+        TaskDocument task = task("task-1", TaskStatus.TODO);
+        task.setDescription("Old description");
+        when(taskRepository.findById("task-1")).thenReturn(Optional.of(task));
+        when(taskRepository.save(task)).thenReturn(task);
+
+        TaskDocument result = taskService.updateTask("task-1", new UpdateTaskRequest(
+                null,
+                "sprint-2",
+                "Updated title",
+                null,
+                TaskPriority.LOW,
+                "user-3",
+                List.of("api", "qa")
+        ));
+
+        assertSame(task, result);
+        assertEquals("project-1", result.getProjectId());
+        assertEquals("sprint-2", result.getSprintId());
+        assertEquals("Updated title", result.getTitle());
+        assertEquals("Old description", result.getDescription());
+        assertEquals(TaskPriority.LOW, result.getPriority());
+        assertEquals("user-3", result.getAssignee());
+        assertEquals(List.of("api", "qa"), result.getLabels());
+        verify(taskRepository).save(task);
     }
 
     @Test
@@ -136,6 +204,48 @@ class TaskServiceTest {
     }
 
     @Test
+    void getCommentsReturnsDefensiveCopy() {
+        TaskDocument task = task("task-1", TaskStatus.TODO);
+        task.getComments().add(new TaskComment("comment-1", "user-1", "Looks good", null));
+        when(taskRepository.findById("task-1")).thenReturn(Optional.of(task));
+
+        List<?> comments = taskService.getComments("task-1");
+
+        assertEquals(1, comments.size());
+        assertThrows(UnsupportedOperationException.class, () -> comments.clear());
+    }
+
+    @Test
+    void addAttachmentAppendsMetadataWithUploader() {
+        TaskDocument task = task("task-1", TaskStatus.TODO);
+        when(taskRepository.findById("task-1")).thenReturn(Optional.of(task));
+        when(taskRepository.save(task)).thenReturn(task);
+
+        var attachment = taskService.addAttachment("task-1",
+                new AddAttachmentRequest("error.png", "image/png", 42L, "https://files/error.png"),
+                "user-1");
+
+        assertNotNull(attachment.id());
+        assertEquals("error.png", attachment.fileName());
+        assertEquals("image/png", attachment.contentType());
+        assertEquals(42L, attachment.size());
+        assertEquals("https://files/error.png", attachment.url());
+        assertEquals("user-1", attachment.uploadedBy());
+        assertNotNull(attachment.uploadedAt());
+        assertEquals(1, task.getAttachments().size());
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    void deleteTaskDeletesExistingTask() {
+        when(taskRepository.existsById("task-1")).thenReturn(true);
+
+        taskService.deleteTask("task-1");
+
+        verify(taskRepository).deleteById("task-1");
+    }
+
+    @Test
     void deleteTasksByProjectIdDelegatesToRepository() {
         when(taskRepository.deleteByProjectId("project-1")).thenReturn(3L);
 
@@ -160,18 +270,23 @@ class TaskServiceTest {
     }
 
     @Test
+    void markSprintUnfinishedTasksDoneReturnsZeroWhenNothingChanged() {
+        when(taskRepository.findBySprintIdAndStatusNot("sprint-1", TaskStatus.DONE)).thenReturn(List.of());
+
+        int changed = taskService.markSprintUnfinishedTasksDone("sprint-1");
+
+        assertEquals(0, changed);
+        verify(taskRepository).saveAll(List.of());
+    }
+
+    @Test
     void deleteTaskFailsWhenTaskDoesNotExist() {
         when(taskRepository.existsById("missing")).thenReturn(false);
 
-        try {
-            taskService.deleteTask("missing");
-        } catch (RuntimeException exception) {
-            assertTrue(exception.getMessage().contains("missing"));
-            verify(taskRepository, never()).deleteById("missing");
-            return;
-        }
+        TaskNotFoundException exception = assertThrows(TaskNotFoundException.class, () -> taskService.deleteTask("missing"));
 
-        assertFalse(true, "Expected deleteTask to throw when task does not exist");
+        assertTrue(exception.getMessage().contains("missing"));
+        verify(taskRepository, never()).deleteById("missing");
     }
 
     private TaskDocument task(String id, TaskStatus status) {
