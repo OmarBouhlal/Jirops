@@ -2,7 +2,7 @@ package com.jiraclone.task.controller;
 
 import com.jiraclone.task.domain.TaskAttachment;
 import com.jiraclone.task.dto.AddAttachmentRequest;
-import com.jiraclone.task.security.GatewayHeaderAuthenticationFilter;
+import com.jirops.jwt.GatewayHeaderAuthenticationFilter;
 import com.jiraclone.task.service.TaskService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
