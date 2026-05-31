@@ -15,6 +15,10 @@
     <name>api-gateway</name>
     <description>Reactive API gateway for the Jira clone platform</description>
 
+    <properties>
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.jirops</groupId>

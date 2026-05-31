@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.micrometer.core.annotation.Timed;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @Timed(value = "project.service.create")
     public ProjectResponse createProject(CreateProjectRequest request, UUID ownerId) {
         String normalizedKey = request.key().trim().toUpperCase(Locale.ROOT);
         if (projectRepository.existsByKey(normalizedKey)) {
@@ -67,6 +69,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    @Timed(value = "project.service.get-all")
     public List<ProjectResponse> getProjects(UUID userId) {
         return projectRepository.findByOwnerIdOrMembersContainingAndDeletedFalse(userId, userId)
                 .stream()
@@ -75,6 +78,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    @Timed(value = "project.service.get-by-id")
     public ProjectResponse getProjectById(UUID id, UUID userId) {
         Project project = getProjectOrThrow(id);
         ensureAccess(project, userId);
@@ -82,6 +86,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @Timed(value = "project.service.update")
     public ProjectResponse updateProject(UUID id, UUID userId, UpdateProjectRequest request) {
         Project project = getProjectOrThrow(id);
         ensureOwner(project, userId);
@@ -97,6 +102,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @Timed(value = "project.service.delete")
     public void deleteProject(UUID id, UUID userId) {
         Project project = getProjectOrThrow(id);
         ensureOwner(project, userId);
@@ -110,6 +116,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @Timed(value = "project.service.add-member")
     public ProjectResponse addMember(UUID projectId, UUID userId, UUID memberToAdd) {
         Project project = getProjectOrThrow(projectId);
         ensureOwner(project, userId);

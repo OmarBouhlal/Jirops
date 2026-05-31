@@ -19,6 +19,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.annotation.Timed;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -52,6 +53,7 @@ public class AuthService {
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
+    @Timed(value = "auth.service.register")
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new EmailAlreadyExistsException("Email already exists");
@@ -71,6 +73,7 @@ public class AuthService {
         return createSession(user);
     }
 
+    @Timed(value = "auth.service.login")
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
@@ -83,6 +86,7 @@ public class AuthService {
         return createSession(user);
     }
 
+    @Timed(value = "auth.service.refresh")
     public AuthResponse refresh(RefreshRequest request) {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.refreshToken())
                 .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
@@ -115,6 +119,7 @@ public class AuthService {
         return createSession(user);
     }
 
+    @Timed(value = "auth.service.logout")
     public void logout(RefreshRequest request) {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.refreshToken())
                 .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
