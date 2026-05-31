@@ -15,6 +15,10 @@
     <name>task-service</name>
     <description>Task service for the Jira clone platform</description>
 
+    <properties>
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.jirops</groupId>

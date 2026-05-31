@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import io.micrometer.core.annotation.Timed;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -42,6 +43,7 @@ public class SprintService {
     }
 
     @Transactional
+    @Timed(value = "planning.service.create-sprint")
     public SprintResponse createSprint(CreateSprintRequest request) {
         Sprint sprint = new Sprint();
         sprint.setProjectId(request.projectId());
@@ -57,6 +59,7 @@ public class SprintService {
     }
 
     @Transactional(readOnly = true)
+    @Timed(value = "planning.service.get-sprints")
     public List<SprintResponse> getSprints(UUID projectId) {
         return sprintRepository.findByProjectId(projectId).stream()
                 .map(this::toResponse)
@@ -64,6 +67,7 @@ public class SprintService {
     }
 
     @Transactional
+    @Timed(value = "planning.service.start-sprint")
     public SprintResponse startSprint(UUID sprintId, UUID projectId) {
         Sprint sprint = getSprintOrThrow(sprintId, projectId);
         if (sprint.getStatus() == SprintStatus.CLOSED) {
@@ -93,6 +97,7 @@ public class SprintService {
     }
 
     @Transactional
+    @Timed(value = "planning.service.complete-sprint")
     public SprintResponse completeSprint(UUID sprintId, UUID projectId) {
         Sprint sprint = getSprintOrThrow(sprintId, projectId);
         if (sprint.getStatus() != SprintStatus.ACTIVE) {
@@ -109,6 +114,7 @@ public class SprintService {
     }
 
     @Transactional
+    @Timed(value = "planning.service.add-task-to-sprint")
     public SprintResponse addTaskToSprint(UUID sprintId, UUID taskId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new SprintNotFoundException("Sprint not found"));
