@@ -49,7 +49,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
   zipkin:
     tracing:
       endpoint: http://zipkin:9411/api/v2/spans

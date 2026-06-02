@@ -58,7 +58,7 @@ mvn clean package -DskipTests
 
 ## 2. Start the Docker Stack
 
-Start everything currently defined in `docker-compose.yml`:
+Start everything currently defined in `docker-compose.yml`, including `api-gateway`:
 
 ```bash
 docker compose up --build -d
@@ -156,6 +156,13 @@ xdg-open http://localhost:3000
 ```
 
 Note: Prometheus scrapes `auth-service`, `project-service`, `planning-service`, `task-service`, and `api-gateway` from `prometheus.yml`.
+
+Verify the metrics endpoints directly if you need to debug scraping:
+
+```bash
+curl -s http://localhost:8084/actuator/prometheus | head
+curl -s http://localhost:8080/actuator/prometheus | head
+```
 
 ## 4. End-to-End API Test Through the Gateway
 
