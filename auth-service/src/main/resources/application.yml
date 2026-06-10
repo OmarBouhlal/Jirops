@@ -3,7 +3,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    prometheus:
-      enabled: true
+        include: health,info,metrics

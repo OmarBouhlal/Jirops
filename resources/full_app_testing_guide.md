@@ -148,22 +148,6 @@ Zipkin UI:
 xdg-open http://localhost:9411
 ```
 
-Prometheus and Grafana:
-
-```bash
-xdg-open http://localhost:9090
-xdg-open http://localhost:3000
-```
-
-Note: Prometheus scrapes `auth-service`, `project-service`, `planning-service`, `task-service`, and `api-gateway` from `prometheus.yml`.
-
-Verify the metrics endpoints directly if you need to debug scraping:
-
-```bash
-curl -s http://localhost:8084/actuator/prometheus | head
-curl -s http://localhost:8080/actuator/prometheus | head
-```
-
 ## 4. End-to-End API Test Through the Gateway
 
 Set the gateway base URL:
