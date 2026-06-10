@@ -78,4 +78,15 @@ class JwtTokenProviderTest {
 
         assertThat(provider.isAccessToken(refreshToken)).isFalse();
     }
+
+    @Test
+    @DisplayName("refreshTokensAreUniquePerIssuance")
+    void refreshTokensAreUniquePerIssuance() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 60_000, 120_000);
+
+        String first = provider.generateRefreshToken("user-42");
+        String second = provider.generateRefreshToken("user-42");
+
+        assertThat(second).isNotEqualTo(first);
+    }
 }

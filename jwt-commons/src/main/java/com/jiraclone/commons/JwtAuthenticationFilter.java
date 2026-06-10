@@ -14,8 +14,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Set<String> PUBLIC_AUTH_PATHS = Set.of(
+            "/auth/login",
+            "/auth/register",
+            "/auth/refresh",
+            "/auth/logout"
+    );
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -25,8 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.startsWith("/auth/");
+        return PUBLIC_AUTH_PATHS.contains(request.getRequestURI());
     }
 
     @Override

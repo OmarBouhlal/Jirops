@@ -27,6 +27,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -157,6 +160,35 @@ class AuthControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("OPTIONS /auth/login returns 200 for CORS preflight")
+    void loginPreflightAllowed() throws Exception {
+        mockMvc.perform(options("/auth/login")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /auth/users valid returns 200")
+    void usersSuccess() throws Exception {
+        register("user@example.com", "secret123");
+        String accessToken = loginAndReadAccessToken("user@example.com", "secret123");
+
+        mockMvc.perform(get("/auth/users")
+                        .header(AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("user@example.com"));
+    }
+
+    @Test
+    @DisplayName("GET /auth/users without token returns 401")
+    void usersWithoutTokenReturns401() throws Exception {
+        mockMvc.perform(get("/auth/users"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private void register(String email, String password) throws Exception {
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -165,6 +197,18 @@ class AuthControllerIT {
     }
 
     private String loginAndReadRefreshToken(String email, String password) throws Exception {
+        JsonNode node = loginAndReadTokenPayload(email, password);
+        assertThat(node.get("refreshToken").asText()).isNotBlank();
+        return node.get("refreshToken").asText();
+    }
+
+    private String loginAndReadAccessToken(String email, String password) throws Exception {
+        JsonNode node = loginAndReadTokenPayload(email, password);
+        assertThat(node.get("accessToken").asText()).isNotBlank();
+        return node.get("accessToken").asText();
+    }
+
+    private JsonNode loginAndReadTokenPayload(String email, String password) throws Exception {
         String response = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(new LoginRequest(email, password))))
@@ -173,9 +217,7 @@ class AuthControllerIT {
                 .getResponse()
                 .getContentAsString();
 
-        JsonNode node = objectMapper.readTree(response);
-        assertThat(node.get("refreshToken").asText()).isNotBlank();
-        return node.get("refreshToken").asText();
+        return objectMapper.readTree(response);
     }
 
     private String json(Object value) throws Exception {

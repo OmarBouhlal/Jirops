@@ -12,7 +12,6 @@
     </parent>
 
     <artifactId>jwt-commons</artifactId>
-    <version>1.0.0</version>
     <name>jwt-commons</name>
     <description>Shared JWT security support</description>
 
