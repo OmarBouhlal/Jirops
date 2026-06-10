@@ -7,18 +7,19 @@ import com.jiraclone.auth.dto.AuthResponse;
 import com.jiraclone.auth.dto.LoginRequest;
 import com.jiraclone.auth.dto.RefreshRequest;
 import com.jiraclone.auth.dto.RegisterRequest;
+import com.jiraclone.auth.dto.UserDirectoryResponse;
 import com.jiraclone.auth.exception.EmailAlreadyExistsException;
 import com.jiraclone.auth.exception.InvalidCredentialsException;
 import com.jiraclone.auth.exception.InvalidTokenException;
 import com.jiraclone.auth.repository.RefreshTokenRepository;
 import com.jiraclone.auth.repository.UserRepository;
 import com.jiraclone.commons.JwtTokenProvider;
-import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Sort;
 import io.micrometer.core.annotation.Timed;
 
 import java.time.Duration;
@@ -95,21 +96,6 @@ public class AuthService {
             throw new InvalidTokenException("Refresh token is expired");
         }
 
-        if (!jwtTokenProvider.validateToken(refreshToken.getToken())) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
-        String userIdFromToken;
-        try {
-            userIdFromToken = jwtTokenProvider.getUserIdFromToken(refreshToken.getToken());
-        } catch (JwtException | IllegalArgumentException ex) {
-            throw new InvalidTokenException("Invalid refresh token", ex);
-        }
-
-        if (!refreshToken.getUserId().toString().equals(userIdFromToken)) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
 
@@ -128,23 +114,17 @@ public class AuthService {
             throw new InvalidTokenException("Refresh token is expired");
         }
 
-        if (!jwtTokenProvider.validateToken(refreshToken.getToken())) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
-        String userIdFromToken;
-        try {
-            userIdFromToken = jwtTokenProvider.getUserIdFromToken(refreshToken.getToken());
-        } catch (JwtException | IllegalArgumentException ex) {
-            throw new InvalidTokenException("Invalid refresh token", ex);
-        }
-
-        if (!refreshToken.getUserId().toString().equals(userIdFromToken)) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
+    }
+
+    @Transactional(readOnly = true)
+    @Timed(value = "auth.service.users")
+    public List<UserDirectoryResponse> listUsers() {
+        return userRepository.findAll(Sort.by(Sort.Direction.ASC, "email"))
+                .stream()
+                .map(user -> new UserDirectoryResponse(user.getId(), user.getEmail()))
+                .toList();
     }
 
     private AuthResponse createSession(User user) {

@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 public class JwtTokenProvider {
 
@@ -35,6 +36,8 @@ public class JwtTokenProvider {
                 .subject(userId)
                 .claim(ROLES_CLAIM, roles == null ? List.of() : List.copyOf(roles))
                 .claim(TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .claim("jti", UUID.randomUUID().toString())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(accessTokenExpiryMs)))
                 .signWith(secretKey)
@@ -46,6 +49,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(userId)
                 .claim(TYPE_CLAIM, "refresh")
+                .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(refreshTokenExpiryMs)))
                 .signWith(secretKey)

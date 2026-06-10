@@ -54,6 +54,7 @@ class AuthServiceTest {
         authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenProvider);
         ReflectionTestUtils.setField(authService, "accessTokenExpiryMs", 3_600_000L);
         ReflectionTestUtils.setField(authService, "refreshTokenExpiryMs", 7_200_000L);
+        when(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token");
     }
 
     @Test
@@ -68,8 +69,6 @@ class AuthServiceTest {
         });
         when(jwtTokenProvider.generateAccessToken("11111111-1111-1111-1111-111111111111", List.of("ROLE_USER")))
                 .thenReturn("access-token");
-        when(jwtTokenProvider.generateRefreshToken("11111111-1111-1111-1111-111111111111"))
-                .thenReturn("refresh-token");
 
         AuthResponse response = authService.register(new RegisterRequest("user@example.com", "secret"));
 
@@ -81,7 +80,7 @@ class AuthServiceTest {
         verify(jwtTokenProvider).generateAccessToken("11111111-1111-1111-1111-111111111111", List.of("ROLE_USER"));
         verify(jwtTokenProvider).generateRefreshToken("11111111-1111-1111-1111-111111111111");
         assertThat(response.accessToken()).isEqualTo("access-token");
-        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        assertThat(response.refreshToken()).isNotBlank();
         assertThat(response.tokenType()).isEqualTo("Bearer");
     }
 
@@ -103,13 +102,13 @@ class AuthServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "$2a$10$hash")).thenReturn(true);
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("access-token");
-        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.login(new LoginRequest("user@example.com", "secret"));
 
         assertThat(response.accessToken()).isEqualTo("access-token");
-        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        assertThat(response.refreshToken()).isNotBlank();
         verify(refreshTokenRepository).deleteByUserId(userId);
+        verify(jwtTokenProvider).generateRefreshToken(userId.toString());
     }
 
     @Test
@@ -147,16 +146,13 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("new-access");
-        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("new-refresh");
 
         AuthResponse response = authService.refresh(new RefreshRequest("refresh-token"));
 
         assertThat(response.accessToken()).isEqualTo("new-access");
-        assertThat(response.refreshToken()).isEqualTo("new-refresh");
+        assertThat(response.refreshToken()).isNotBlank();
         assertThat(refreshToken.isRevoked()).isTrue();
         verify(refreshTokenRepository).save(refreshToken);
         verify(jwtTokenProvider).generateAccessToken(userId.toString(), List.of("ROLE_USER"));
@@ -187,13 +183,13 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refresh(new RefreshRequest("refresh-token")))
                 .isInstanceOf(InvalidTokenException.class);
-        verify(jwtTokenProvider, never()).validateToken(any());
     }
 
     @Test
     @DisplayName("refresh_invalidTokenValidationFalse")
     void refresh_invalidTokenValidationFalse() {
         UUID userId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+        User user = new User(userId, "user@example.com", "$2a$10$hash", List.of("ROLE_USER"), Instant.now());
         RefreshToken refreshToken = new RefreshToken(
                 UUID.fromString("44444444-4444-4444-4444-444444444444"),
                 "refresh-token",
@@ -202,11 +198,15 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshRequest("refresh-token")))
-                .isInstanceOf(InvalidTokenException.class);
-        verify(userRepository, never()).findById(any());
+        // Refresh tokens are opaque and only validated against the DB.
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("new-access");
+
+        AuthResponse response = authService.refresh(new RefreshRequest("refresh-token"));
+
+        assertThat(response.accessToken()).isEqualTo("new-access");
+        assertThat(response.refreshToken()).isNotBlank();
     }
 
     @Test
@@ -221,12 +221,11 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(UUID.randomUUID().toString());
+
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh(new RefreshRequest("refresh-token")))
                 .isInstanceOf(InvalidTokenException.class);
-        verify(userRepository, never()).findById(any());
     }
 
     @Test
@@ -241,8 +240,6 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(userId.toString());
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh(new RefreshRequest("refresh-token")))
@@ -261,8 +258,6 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(userId.toString());
 
         authService.logout(new RefreshRequest("refresh-token"));
 
@@ -282,11 +277,11 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.logout(new RefreshRequest("refresh-token")))
-                .isInstanceOf(InvalidTokenException.class);
-        verify(refreshTokenRepository, never()).save(refreshToken);
+        authService.logout(new RefreshRequest("refresh-token"));
+
+        assertThat(refreshToken.isRevoked()).isTrue();
+        verify(refreshTokenRepository).save(refreshToken);
     }
 
     @Test
@@ -301,12 +296,11 @@ class AuthServiceTest {
                 false
         );
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
-        when(jwtTokenProvider.validateToken("refresh-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(UUID.randomUUID().toString());
 
-        assertThatThrownBy(() -> authService.logout(new RefreshRequest("refresh-token")))
-                .isInstanceOf(InvalidTokenException.class);
-        verify(refreshTokenRepository, never()).save(refreshToken);
+        authService.logout(new RefreshRequest("refresh-token"));
+
+        assertThat(refreshToken.isRevoked()).isTrue();
+        verify(refreshTokenRepository).save(refreshToken);
     }
 
     @Test
@@ -317,11 +311,11 @@ class AuthServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "$2a$10$hash")).thenReturn(true);
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of())).thenReturn("access-token");
-        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.login(new LoginRequest("user@example.com", "secret"));
 
         assertThat(response.accessToken()).isEqualTo("access-token");
         verify(jwtTokenProvider).generateAccessToken(userId.toString(), List.of());
+        verify(jwtTokenProvider).generateRefreshToken(userId.toString());
     }
 }

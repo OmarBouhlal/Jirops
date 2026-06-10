@@ -1,3 +1,5 @@
+import { loadSession, saveSession } from './storage';
+
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 const API_BASE_URL = rawBaseUrl.replace(/\/$/, '');
 
@@ -52,10 +54,62 @@ function headersFor(token) {
   return headers;
 }
 
-async function request(path, { method = 'GET', body, token, signal } = {}) {
+function resolveToken(token) {
+  return loadSession()?.accessToken || token;
+}
+
+const NO_REFRESH_PATHS = new Set([
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+]);
+
+let refreshInFlight = null;
+
+async function refreshSession() {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  const session = loadSession();
+
+  if (!session?.refreshToken) {
+    return null;
+  }
+
+  refreshInFlight = (async () => {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: headersFor(),
+      body: JSON.stringify({ refreshToken: session.refreshToken }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await parseResponse(response);
+    const nextSession = {
+      ...session,
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken,
+      tokenType: payload.tokenType,
+      expiresIn: payload.expiresIn,
+    };
+    saveSession(nextSession, { notify: true });
+    return nextSession;
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+
+  return refreshInFlight;
+}
+
+async function performRequest(path, { method = 'GET', body, token, signal } = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
-    headers: headersFor(token),
+    headers: headersFor(resolveToken(token)),
     signal,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -67,11 +121,30 @@ async function request(path, { method = 'GET', body, token, signal } = {}) {
   return parseResponse(response);
 }
 
+async function request(path, options = {}) {
+  try {
+    return await performRequest(path, options);
+  } catch (error) {
+    if (!NO_REFRESH_PATHS.has(path) && (error?.status === 401 || error?.status === 403)) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        return performRequest(path, {
+          ...options,
+          token: refreshed.accessToken,
+        });
+      }
+    }
+
+    throw error;
+  }
+}
+
 export const api = {
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   refresh: (payload) => request('/auth/refresh', { method: 'POST', body: payload }),
   logout: (payload) => request('/auth/logout', { method: 'POST', body: payload }),
+  listUsers: (token) => request('/auth/users', { token }),
   listProjects: (token) => request('/projects', { token }),
   createProject: (token, payload) => request('/projects', { method: 'POST', body: payload, token }),
   updateProject: (token, id, payload) =>
