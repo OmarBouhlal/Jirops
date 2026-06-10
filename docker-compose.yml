@@ -175,6 +175,27 @@ services:
     networks:
       - jira-net
 
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - jira-net
+
   auth-service:
     build:
       context: .

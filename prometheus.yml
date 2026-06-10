@@ -21,3 +21,15 @@ scrape_configs:
     static_configs:
       - targets:
           - planning-service:8083
+
+  - job_name: task-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - task-service:8084
+
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - api-gateway:8080
