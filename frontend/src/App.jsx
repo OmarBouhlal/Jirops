@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import { loadSession, saveSession } from './lib/storage';
 
+// Component imports
+import { Sidebar } from './components/Sidebar';
+import { DashboardView } from './components/DashboardView';
+import { BoardView } from './components/BoardView';
+import { SprintsView } from './components/SprintsView';
+import { ProjectSettingsView } from './components/ProjectSettingsView';
+import { ConfirmModal, EditProjectModal } from './components/Modal';
+import { CreateTaskDrawer, CreateSprintDrawer, CreateProjectDrawer } from './components/Drawers';
+
+import { Key, Mail, Lock, ShieldAlert, Award, Compass, Sparkles } from 'lucide-react';
+
 const statusOrder = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 const statusLabels = {
   TODO: 'To do',
@@ -9,21 +20,8 @@ const statusLabels = {
   IN_REVIEW: 'In review',
   DONE: 'Done',
 };
-const statusTone = {
-  TODO: 'border-slate-500/30 bg-slate-500/10 text-slate-200',
-  IN_PROGRESS: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
-  IN_REVIEW: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
-  DONE: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-};
-const priorityTone = {
-  LOW: 'text-slate-300',
-  MEDIUM: 'text-cyan-200',
-  HIGH: 'text-amber-200',
-  CRITICAL: 'text-rose-200',
-};
 
 const emptyAuth = { email: '', password: '' };
-
 const emptyProject = { name: '', key: '', description: '' };
 const emptySprint = { name: '', goal: '', startDate: '', endDate: '' };
 const emptyTask = {
@@ -35,34 +33,11 @@ const emptyTask = {
   labels: '',
 };
 
-function formatDate(value) {
-  if (!value) return 'Not set';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not set';
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-}
-
-function formatDateTime(value) {
-  if (!value) return 'Not set';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not set';
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
-function splitLabels(raw) {
-  return raw
-    .split(',')
-    .map((label) => label.trim())
-    .filter(Boolean);
+function getTaskCounts(tasks) {
+  return statusOrder.reduce((acc, status) => {
+    acc[status] = tasks.filter((task) => task.status === status).length;
+    return acc;
+  }, {});
 }
 
 function suggestProjectKey(name) {
@@ -72,119 +47,47 @@ function suggestProjectKey(name) {
     .slice(0, 10);
 }
 
-function getTaskCounts(tasks) {
-  return statusOrder.reduce((acc, status) => {
-    acc[status] = tasks.filter((task) => task.status === status).length;
-    return acc;
-  }, {});
-}
-
-function SectionCard({ title, eyebrow, action, children, className = '' }) {
-  return (
-    <section className={`glass rounded-3xl p-5 shadow-glow ${className}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          {eyebrow ? (
-            <p className="text-xs uppercase tracking-[0.35em] text-sky-200/70">{eyebrow}</p>
-          ) : null}
-          <h2 className="mt-1 font-display text-xl font-semibold text-white">{title}</h2>
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, hint, children, className = '' }) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-sm font-medium text-slate-200">{label}</span>
-      {children}
-      {hint ? <span className="mt-1 block text-xs text-slate-400">{hint}</span> : null}
-    </label>
-  );
-}
-
-function Input(props) {
-  return (
-    <input
-      {...props}
-      className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400/40 focus:bg-white/10 ${props.className || ''}`}
-    />
-  );
-}
-
-function TextArea(props) {
-  return (
-    <textarea
-      {...props}
-      className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400/40 focus:bg-white/10 ${props.className || ''}`}
-    />
-  );
-}
-
-function Select(props) {
-  return (
-    <select
-      {...props}
-      className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/40 focus:bg-white/10 ${props.className || ''}`}
-    />
-  );
-}
-
-function Button({ variant = 'primary', className = '', ...props }) {
-  const styles = {
-    primary:
-      'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 shadow-[0_18px_40px_rgba(56,189,248,0.24)] hover:brightness-110',
-    secondary: 'border border-white/10 bg-white/5 text-white hover:bg-white/10',
-    ghost: 'text-slate-300 hover:bg-white/5 hover:text-white',
-    danger: 'border border-rose-500/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20',
-  };
-
-  return (
-    <button
-      {...props}
-      className={`inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${styles[variant]} ${className}`}
-    />
-  );
-}
-
-function Badge({ children, className = '' }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StatCard({ label, value, detail }) {
-  return (
-    <div className="glass rounded-3xl p-4 shadow-glow">
-      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{label}</p>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="text-3xl font-bold text-white">{value}</div>
-        {detail ? <div className="text-sm text-slate-300">{detail}</div> : null}
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const [session, setSession] = useState(() => loadSession() || null);
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState(emptyAuth);
+  
+  // Tab Navigation state
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Lists state
   const [projects, setProjects] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+
+  // Form states (controlled inputs)
   const [projectForm, setProjectForm] = useState(emptyProject);
   const [sprintForm, setSprintForm] = useState(emptySprint);
   const [taskForm, setTaskForm] = useState(emptyTask);
   const [projectMemberId, setProjectMemberId] = useState('');
   const [taskFilter, setTaskFilter] = useState('');
+
+  // Modals & Drawers open states
+  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
+  const [sprintDrawerOpen, setSprintDrawerOpen] = useState(false);
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+  
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    type: 'danger',
+    onConfirm: () => {}
+  });
+
+  const [editProjectModal, setEditProjectModal] = useState({
+    isOpen: false,
+    project: null
+  });
+
+  // UI state
   const [message, setMessage] = useState(null);
   const [busy, setBusy] = useState({
     auth: false,
@@ -207,10 +110,15 @@ function App() {
     [sprints],
   );
 
+  // Sync session storage
   useEffect(() => {
     saveSession(session);
+    if (session?.accessToken) {
+      // Decode user details if any or standard load
+    }
   }, [session]);
 
+  // Set default project selection
   useEffect(() => {
     if (!projects.length) {
       setSelectedProjectId('');
@@ -222,6 +130,7 @@ function App() {
     }
   }, [projects, selectedProjectId]);
 
+  // Load sprints & tasks when workspace changes
   useEffect(() => {
     if (!selectedProjectId || !session?.accessToken) {
       setSprints([]);
@@ -240,7 +149,6 @@ function App() {
           api.listSprints(session.accessToken, selectedProjectId),
           api.listTasks(session.accessToken, {
             projectId: selectedProjectId,
-            status: taskFilter || undefined,
           }),
         ]);
 
@@ -264,8 +172,9 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedProjectId, session?.accessToken, taskFilter]);
+  }, [selectedProjectId, session?.accessToken]);
 
+  // Load projects list
   useEffect(() => {
     if (!session?.accessToken) {
       setProjects([]);
@@ -301,14 +210,27 @@ function App() {
     };
   }, [session?.accessToken]);
 
+  // Reset page view details when project changes
   useEffect(() => {
     setProjectMemberId('');
     setSprintForm(emptySprint);
     setTaskForm(emptyTask);
+    
+    // Automatically default to dashboard view if switching projects
+    if (selectedProjectId) {
+      // Keep current tab but make sure settings works
+      if (activeTab === 'settings' && !selectedProjectId) {
+        setActiveTab('dashboard');
+      }
+    }
   }, [selectedProjectId]);
 
   function notify(type, text) {
     setMessage({ type, text });
+    // Auto clear notices after 4s
+    setTimeout(() => {
+      setMessage((current) => (current && current.text === text ? null : current));
+    }, 4000);
   }
 
   function requireToken() {
@@ -331,11 +253,13 @@ function App() {
       const response =
         authMode === 'login' ? await api.login(payload) : await api.register(payload);
 
+      // Add email info dynamically to session
       setSession({
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
         tokenType: response.tokenType,
         expiresIn: response.expiresIn,
+        email: authForm.email.trim()
       });
       setAuthForm(emptyAuth);
       notify('success', authMode === 'login' ? 'Welcome back.' : 'Account created.');
@@ -365,6 +289,7 @@ function App() {
       setSprints([]);
       setTasks([]);
       setSelectedProjectId('');
+      setActiveTab('dashboard');
       notify('info', 'Signed out.');
     }
   }
@@ -382,12 +307,13 @@ function App() {
     const token = requireToken();
     const [nextSprints, nextTasks] = await Promise.all([
       api.listSprints(token, projectId),
-      api.listTasks(token, { projectId, status: taskFilter || undefined }),
+      api.listTasks(token, { projectId }),
     ]);
     setSprints(Array.isArray(nextSprints) ? nextSprints : []);
     setTasks(Array.isArray(nextTasks) ? nextTasks : []);
   }
 
+  // Projects Handlers
   async function handleProjectSubmit(event) {
     event.preventDefault();
     setBusy((current) => ({ ...current, projectCreate: true }));
@@ -403,6 +329,7 @@ function App() {
 
       await refreshProjects(response.id);
       setProjectForm(emptyProject);
+      setProjectDrawerOpen(false);
       notify('success', `Project ${response.key} created.`);
     } catch (error) {
       notify('error', error.message);
@@ -411,76 +338,74 @@ function App() {
     }
   }
 
-  async function handleProjectUpdate(project) {
-    const nextName = window.prompt('Project name', project.name);
-    if (nextName === null) return;
+  function triggerProjectUpdate(project) {
+    setEditProjectModal({
+      isOpen: true,
+      project: project
+    });
+  }
 
-    const nextDescription = window.prompt('Project description', project.description || '');
-    if (nextDescription === null) return;
-
+  async function handleProjectUpdateDetails(details) {
+    if (!activeProject) return;
     try {
       const token = requireToken();
-      await api.updateProject(token, project.id, {
-        name: nextName.trim(),
-        description: nextDescription.trim(),
+      await api.updateProject(token, activeProject.id, {
+        name: details.name,
+        description: details.description,
       });
-      await refreshProjects(project.id);
-      await refreshWorkspace(project.id);
+      await refreshProjects(activeProject.id);
+      await refreshWorkspace(activeProject.id);
       notify('success', 'Project updated.');
     } catch (error) {
       notify('error', error.message);
     }
   }
 
-  async function handleProjectDelete(project) {
-    const confirmed = window.confirm(`Delete ${project.name}?`);
-    if (!confirmed) return;
-
-    try {
-      const token = requireToken();
-      await api.deleteProject(token, project.id);
-      const nextProjects = projects.filter((item) => item.id !== project.id);
-      setProjects(nextProjects);
-      const fallbackId = nextProjects[0]?.id || '';
-      setSelectedProjectId(fallbackId);
-      if (fallbackId) {
-        await refreshWorkspace(fallbackId);
-      } else {
-        setSprints([]);
-        setTasks([]);
+  function triggerProjectDelete(project) {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Project',
+      message: `Are you sure you want to delete "${project.name}" (${project.key})? This action cannot be undone and will delete all associated Sprints and Tasks.`,
+      confirmText: 'Delete Project',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const token = requireToken();
+          await api.deleteProject(token, project.id);
+          const nextProjects = projects.filter((item) => item.id !== project.id);
+          setProjects(nextProjects);
+          const fallbackId = nextProjects[0]?.id || '';
+          setSelectedProjectId(fallbackId);
+          if (fallbackId) {
+            await refreshWorkspace(fallbackId);
+          } else {
+            setSprints([]);
+            setTasks([]);
+          }
+          notify('success', 'Project deleted.');
+        } catch (error) {
+          notify('error', error.message);
+        }
       }
-      notify('success', 'Project deleted.');
-    } catch (error) {
-      notify('error', error.message);
-    }
+    });
   }
 
-  async function handleProjectMemberSubmit(event, projectId) {
-    event.preventDefault();
-    if (!projectId) {
-      return;
-    }
-    const data = new FormData(event.currentTarget);
-    const userId = String(data.get('userId') || '').trim();
-    if (!userId) return;
-
+  async function handleAddProjectMember(userId) {
+    if (!selectedProjectId) return;
     try {
       const token = requireToken();
-      await api.addProjectMember(token, projectId, { userId });
-      await refreshProjects(projectId);
+      await api.addProjectMember(token, selectedProjectId, { userId });
+      await refreshProjects(selectedProjectId);
       notify('success', 'Member added.');
-      setProjectMemberId('');
-      event.currentTarget.reset();
     } catch (error) {
       notify('error', error.message);
     }
   }
 
+  // Sprints Handlers
   async function handleSprintSubmit(event) {
     event.preventDefault();
-    if (!selectedProjectId) {
-      return;
-    }
+    if (!selectedProjectId) return;
     setBusy((current) => ({ ...current, sprintCreate: true }));
     setMessage(null);
 
@@ -495,6 +420,7 @@ function App() {
       });
 
       setSprintForm(emptySprint);
+      setSprintDrawerOpen(false);
       await refreshWorkspace(selectedProjectId);
       notify('success', `Sprint ${response.name} created.`);
     } catch (error) {
@@ -509,7 +435,7 @@ function App() {
       const token = requireToken();
       await action(token, sprint.id);
       await refreshWorkspace(selectedProjectId);
-      notify('success', `Sprint ${sprint.name} updated.`);
+      notify('success', `Sprint ${sprint.name} status updated.`);
     } catch (error) {
       notify('error', error.message);
     }
@@ -517,9 +443,7 @@ function App() {
 
   async function handleAddTaskToSprint(event, sprintId) {
     event.preventDefault();
-    if (!selectedProjectId || !sprintId) {
-      return;
-    }
+    if (!selectedProjectId || !sprintId) return;
     const data = new FormData(event.currentTarget);
     const taskId = String(data.get('taskId') || '').trim();
     if (!taskId) return;
@@ -528,23 +452,25 @@ function App() {
       const token = requireToken();
       await api.addTaskToSprint(token, sprintId, { taskId });
       await refreshWorkspace(selectedProjectId);
-      notify('success', 'Task added to sprint.');
+      notify('success', 'Task assigned to sprint.');
       event.currentTarget.reset();
     } catch (error) {
       notify('error', error.message);
     }
   }
 
+  // Tasks Handlers
   async function handleTaskSubmit(event) {
     event.preventDefault();
-    if (!selectedProjectId) {
-      return;
-    }
+    if (!selectedProjectId) return;
     setBusy((current) => ({ ...current, taskCreate: true }));
     setMessage(null);
 
     try {
       const token = requireToken();
+      
+      const splitLabels = (raw) => raw.split(',').map((label) => label.trim()).filter(Boolean);
+
       await api.createTask(token, {
         projectId: selectedProjectId,
         sprintId: taskForm.sprintId || null,
@@ -556,8 +482,9 @@ function App() {
       });
 
       setTaskForm({ ...emptyTask, sprintId: taskForm.sprintId });
+      setTaskDrawerOpen(false);
       await refreshWorkspace(selectedProjectId);
-      notify('success', 'Task created.');
+      notify('success', 'Task created successfully.');
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -576,113 +503,160 @@ function App() {
     }
   }
 
-  async function handleTaskDelete(task) {
-    const confirmed = window.confirm(`Delete task "${task.title}"?`);
-    if (!confirmed) return;
-
-    try {
-      const token = requireToken();
-      await api.deleteTask(token, task.id);
-      await refreshWorkspace(selectedProjectId);
-      notify('success', 'Task deleted.');
-    } catch (error) {
-      notify('error', error.message);
-    }
+  function triggerTaskDelete(task) {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Task',
+      message: `Are you sure you want to delete the task "${task.title}"? This action cannot be undone.`,
+      confirmText: 'Delete Task',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const token = requireToken();
+          await api.deleteTask(token, task.id);
+          await refreshWorkspace(selectedProjectId);
+          notify('success', 'Task deleted.');
+        } catch (error) {
+          notify('error', error.message);
+        }
+      }
+    });
   }
+
+  // Helper to change view from dashboard
+  const handleDashboardViewChange = (viewId, projectId = null) => {
+    if (projectId) {
+      setSelectedProjectId(projectId);
+    }
+    setActiveTab(viewId);
+  };
 
   const isAuthenticated = Boolean(session?.accessToken);
 
   return (
     <div className="noise relative min-h-screen overflow-hidden">
-      <div className="absolute -left-32 top-24 h-80 w-80 rounded-full bg-sky-500/18 blur-3xl" />
-      <div className="absolute right-0 top-20 h-[28rem] w-[28rem] rounded-full bg-cyan-400/10 blur-3xl" />
-      <div className="relative mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 py-4 sm:px-6 lg:px-8">
-        <header className="glass mb-4 rounded-[2rem] px-5 py-4 shadow-glow">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-sky-200/70">Jirops</p>
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-                <h1 className="font-display text-3xl font-bold text-white">Workspace control room</h1>
-                <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
-                  React + Tailwind
-                </Badge>
-              </div>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-                A focused dashboard for projects, sprints, and tasks. It uses the backend through
-                the API gateway and keeps the interaction model compact enough for daily work.
-              </p>
-            </div>
+      {/* Background gradients */}
+      <div className="absolute -left-32 top-24 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute right-0 top-20 h-[30rem] w-[30rem] rounded-full bg-cyan-400/8 blur-3xl pointer-events-none" />
 
-            <div className="flex flex-wrap items-center gap-3">
-              {isAuthenticated ? (
-                <>
-                  <Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-100">
-                    Connected
-                  </Badge>
-                  <Button variant="secondary" onClick={handleLogout}>
-                    Sign out
-                  </Button>
-                </>
-              ) : (
-                <Badge className="border-amber-400/20 bg-amber-400/10 text-amber-100">
-                  Sign in to continue
-                </Badge>
-              )}
-            </div>
-          </div>
-        </header>
+      {/* Toast Notification */}
+      {message && (
+        <div
+          className={`fixed right-6 top-6 z-50 rounded-2xl border px-5 py-4 text-xs font-semibold shadow-xl backdrop-blur-md animate-scale-up ${
+            message.type === 'error'
+              ? 'border-rose-500/20 bg-rose-950/80 text-rose-200'
+              : message.type === 'success'
+                ? 'border-emerald-500/20 bg-emerald-950/80 text-emerald-200'
+                : 'border-slate-500/20 bg-slate-900/80 text-slate-200'
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
 
-        {message ? (
-          <div
-            className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
-              message.type === 'error'
-                ? 'border-rose-500/20 bg-rose-500/10 text-rose-100'
-                : message.type === 'success'
-                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
-                  : 'border-slate-500/20 bg-slate-500/10 text-slate-100'
-            }`}
-          >
-            {message.text}
-          </div>
-        ) : null}
+      {/* Modals & Drawers */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        type={confirmModal.type}
+      />
 
-        {!isAuthenticated ? (
-          <div className="grid flex-1 gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <section className="glass relative overflow-hidden rounded-[2rem] p-8 shadow-glow">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_25%)]" />
-              <div className="relative max-w-2xl">
-                <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-100">Team hub</Badge>
-                <h2 className="mt-5 font-display text-5xl font-bold leading-tight text-white">
-                  Build a calm command center for product execution.
+      <EditProjectModal
+        isOpen={editProjectModal.isOpen}
+        onClose={() => setEditProjectModal(prev => ({ ...prev, isOpen: false }))}
+        onSave={handleProjectUpdateDetails}
+        project={editProjectModal.project}
+      />
+
+      <CreateTaskDrawer
+        isOpen={taskDrawerOpen}
+        onClose={() => setTaskDrawerOpen(false)}
+        onSubmit={handleTaskSubmit}
+        sprints={sprints}
+        taskForm={taskForm}
+        setTaskForm={setTaskForm}
+        busy={busy.taskCreate}
+      />
+
+      <CreateSprintDrawer
+        isOpen={sprintDrawerOpen}
+        onClose={() => setSprintDrawerOpen(false)}
+        onSubmit={handleSprintSubmit}
+        sprintForm={sprintForm}
+        setSprintForm={setSprintForm}
+        busy={busy.sprintCreate}
+      />
+
+      <CreateProjectDrawer
+        isOpen={projectDrawerOpen}
+        onClose={() => setProjectDrawerOpen(false)}
+        onSubmit={handleProjectSubmit}
+        projectForm={projectForm}
+        setProjectForm={setProjectForm}
+        busy={busy.projectCreate}
+      />
+
+      {/* Main UI Layout */}
+      {!isAuthenticated ? (
+        // Login Page Layout
+        <div className="relative flex min-h-screen items-center justify-center p-4">
+          <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center">
+            {/* Visual Intro Column */}
+            <section className="relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-slate-900/30 p-10 shadow-2xl backdrop-blur-md">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.12),transparent_40%)]" />
+              
+              <div className="relative">
+                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 text-xs font-semibold text-indigo-300">
+                  <Sparkles className="h-3 w-3" /> Calm Control Room
+                </span>
+                
+                <h2 className="mt-6 font-display text-5xl font-extrabold leading-tight text-white tracking-tight">
+                  Calm & structured control for <span className="bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">product builders.</span>
                 </h2>
-                <p className="mt-5 max-w-xl text-base leading-7 text-slate-300">
-                  Projects, sprints, and tasks are presented with a deliberate visual hierarchy:
-                  quick access, useful summaries, and action-heavy cards that stay readable on
-                  desktop and mobile.
+                
+                <p className="mt-6 text-sm leading-relaxed text-slate-300 max-w-xl">
+                  Connect developers, orchestrate milestones, and monitor workspace actions from one single dashboard. Designed with extreme legibility and responsiveness in mind.
                 </p>
 
-                <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                  <StatCard label="Layers" value="3" detail="Projects, sprints, tasks" />
-                  <StatCard label="Flow" value="Fast" detail="API-connected UX" />
-                  <StatCard label="Style" value="Bold" detail="Glass and gradients" />
+                <div className="mt-10 grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/30 p-4">
+                    <Award className="h-5 w-5 text-indigo-400" />
+                    <span className="block text-xl font-bold text-white mt-2">3 Layers</span>
+                    <span className="text-[10px] text-slate-400">Projects, sprints & tasks</span>
+                  </div>
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/30 p-4">
+                    <Compass className="h-5 w-5 text-cyan-400" />
+                    <span className="block text-xl font-bold text-white mt-2">Smooth UI</span>
+                    <span className="text-[10px] text-slate-400">Sidebar navigation</span>
+                  </div>
+                  <div className="rounded-2xl border border-white/5 bg-slate-950/30 p-4">
+                    <Key className="h-5 w-5 text-emerald-400" />
+                    <span className="block text-xl font-bold text-white mt-2">Secure</span>
+                    <span className="text-[10px] text-slate-400">OAuth gateway token flow</span>
+                  </div>
                 </div>
               </div>
             </section>
 
-            <section className="glass rounded-[2rem] p-6 shadow-glow">
-              <div className="mb-6 flex rounded-2xl border border-white/10 bg-white/5 p-1">
+            {/* Auth Form Column */}
+            <section className="glass rounded-[2.5rem] p-8 shadow-2xl">
+              <div className="mb-6 flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
                 <button
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                    authMode === 'login' ? 'bg-white/10 text-white' : 'text-slate-400'
+                  className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+                    authMode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
                   }`}
                   onClick={() => setAuthMode('login')}
                   type="button"
                 >
-                  Login
+                  Sign In
                 </button>
                 <button
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                    authMode === 'register' ? 'bg-white/10 text-white' : 'text-slate-400'
+                  className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+                    authMode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
                   }`}
                   onClick={() => setAuthMode('register')}
                   type="button"
@@ -692,619 +666,150 @@ function App() {
               </div>
 
               <form className="space-y-4" onSubmit={handleAuthSubmit}>
-                <Field label="Email">
-                  <Input
-                    type="email"
-                    autoComplete="email"
-                    value={authForm.email}
-                    onChange={(event) =>
-                      setAuthForm((current) => ({ ...current, email: event.target.value }))
-                    }
-                    placeholder="you@company.com"
-                  />
-                </Field>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-300">Email Address</span>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={authForm.email}
+                      onChange={(e) => setAuthForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3 pl-10 pr-4 text-sm text-white outline-none focus:border-indigo-500/50 transition placeholder:text-slate-600"
+                      placeholder="you@company.com"
+                    />
+                  </div>
+                </label>
 
-                <Field
-                  label="Password"
-                  hint={authMode === 'register' ? 'Minimum 8 characters.' : undefined}
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-300">Password</span>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="password"
+                      required
+                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3 pl-10 pr-4 text-sm text-white outline-none focus:border-indigo-500/50 transition placeholder:text-slate-600"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  {authMode === 'register' && (
+                    <span className="mt-1 block text-[10px] text-slate-400">Must contain at least 8 characters.</span>
+                  )}
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={busy.auth}
+                  className="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3.5 shadow-md shadow-indigo-500/10 hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50 text-sm"
                 >
-                  <Input
-                    type="password"
-                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-                    value={authForm.password}
-                    onChange={(event) =>
-                      setAuthForm((current) => ({ ...current, password: event.target.value }))
-                    }
-                    placeholder="••••••••"
-                  />
-                </Field>
-
-                <Button type="submit" disabled={busy.auth} className="w-full">
-                  {busy.auth
-                    ? 'Working...'
-                    : authMode === 'login'
-                      ? 'Sign in to dashboard'
-                      : 'Create account'}
-                </Button>
+                  {busy.auth ? 'Please wait...' : authMode === 'login' ? 'Enter Control Room' : 'Create Workspace Account'}
+                </button>
               </form>
             </section>
           </div>
-        ) : (
-          <div className="grid flex-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="space-y-4">
-              <SectionCard title="Projects" eyebrow="Workspace" className="sticky top-4">
-                <div className="space-y-3">
-                  <div className="grid gap-2">
-                    <Button
-                      variant="secondary"
-                      className="justify-start"
-                      onClick={() => {
-                        setSelectedProjectId('');
-                        setSprints([]);
-                        setTasks([]);
-                      }}
-                      type="button"
-                    >
-                      All projects
-                    </Button>
-                    {projects.map((project) => (
-                      <button
-                        key={project.id}
-                        type="button"
-                        onClick={() => setSelectedProjectId(project.id)}
-                        className={`rounded-2xl border px-4 py-3 text-left transition ${
-                          selectedProjectId === project.id
-                            ? 'border-sky-400/30 bg-sky-500/15 text-white shadow-[0_16px_50px_rgba(14,165,233,0.15)]'
-                            : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="font-semibold">{project.name}</div>
-                            <div className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                              {project.key}
-                            </div>
-                          </div>
-                          <Badge className="border-white/10 bg-white/5 text-slate-200">
-                            {project.members?.length || 0}
-                          </Badge>
-                        </div>
-                      </button>
-                    ))}
-                    {busy.projects ? <p className="text-sm text-slate-400">Loading projects...</p> : null}
-                  </div>
+        </div>
+      ) : (
+        // Dashboard Authed Layout
+        <div className="relative mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 sm:px-6 lg:px-8">
+          {/* Left Sidebar */}
+          <Sidebar
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            setSelectedProjectId={setSelectedProjectId}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            session={session}
+            handleLogout={handleLogout}
+            onCreateProjectClick={() => setProjectDrawerOpen(true)}
+          />
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="mb-3 text-xs uppercase tracking-[0.28em] text-slate-400">
-                      Quick member add
-                    </p>
-                    <form
-                      className="space-y-2"
-                      onSubmit={(event) => handleProjectMemberSubmit(event, selectedProjectId)}
-                    >
-                      <Input
-                        name="userId"
-                        placeholder="User UUID"
-                        value={projectMemberId}
-                        onChange={(event) => setProjectMemberId(event.target.value)}
-                      />
-                      <Button type="submit" variant="secondary" className="w-full" disabled={!selectedProjectId}>
-                        Add member
-                      </Button>
-                    </form>
-                  </div>
+          {/* Right Main Panel */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Top workspace stats header */}
+            <header className="glass rounded-[2rem] px-6 py-4 shadow-glow flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span className="text-[9px] uppercase tracking-[0.25em] text-indigo-400 font-bold">WORKSPACE ACTION HUB</span>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <h1 className="font-display text-2xl font-bold text-white">
+                    {activeProject ? activeProject.name : 'Workspace Control'}
+                  </h1>
+                  <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-0.5 text-[10px] font-bold text-indigo-300 uppercase">
+                    {activeProject ? activeProject.key : 'ALL'}
+                  </span>
                 </div>
-              </SectionCard>
-            </aside>
-
-            <main className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="Projects" value={projects.length} detail="Total workspaces" />
-                <StatCard label="Active sprints" value={activeSprints.length} detail="Currently running" />
-                <StatCard
-                  label="Tasks"
-                  value={tasks.length}
-                  detail={`${taskCounts.TODO} todo, ${taskCounts.DONE} done`}
-                />
-                <StatCard
-                  label="Selected"
-                  value={activeProject ? activeProject.key : 'None'}
-                  detail={activeProject ? activeProject.name : 'Choose a project'}
-                />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <SectionCard
-                  title="Project studio"
-                  eyebrow="Create and manage"
-                  action={
-                    <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-100">
-                      {activeProject ? activeProject.key : 'No project'}
-                    </Badge>
-                  }
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setTaskDrawerOpen(true)}
+                  disabled={!selectedProjectId}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4.5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <form className="space-y-4" onSubmit={handleProjectSubmit}>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Name">
-                          <Input
-                            value={projectForm.name}
-                            onChange={(event) =>
-                              setProjectForm((current) => {
-                                const nextName = event.target.value;
-                                return {
-                                  ...current,
-                                  name: nextName,
-                                  key: current.key ? current.key : suggestProjectKey(nextName),
-                                };
-                              })
-                            }
-                            placeholder="Launch pad"
-                          />
-                        </Field>
-                        <Field label="Key" hint="Uppercase letters and digits only">
-                          <Input
-                            value={projectForm.key}
-                            onChange={(event) =>
-                              setProjectForm((current) => ({
-                                ...current,
-                                key: event.target.value.toUpperCase(),
-                              }))
-                            }
-                            placeholder="LP"
-                          />
-                        </Field>
-                      </div>
-
-                      <Field label="Description">
-                        <TextArea
-                          rows={4}
-                          value={projectForm.description}
-                          onChange={(event) =>
-                            setProjectForm((current) => ({ ...current, description: event.target.value }))
-                          }
-                          placeholder="Short description of the project."
-                        />
-                      </Field>
-
-                      <Button type="submit" disabled={busy.projectCreate}>
-                        {busy.projectCreate ? 'Creating...' : 'Create project'}
-                      </Button>
-                    </form>
-
-                    <div className="space-y-3">
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
-                          Active project
-                        </p>
-                        {activeProject ? (
-                          <div className="mt-3 space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <h3 className="font-display text-2xl font-semibold text-white">
-                                  {activeProject.name}
-                                </h3>
-                                <p className="mt-1 text-sm text-slate-300">{activeProject.description}</p>
-                              </div>
-                              <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-200">
-                                {activeProject.key}
-                              </Badge>
-                            </div>
-
-                            <div className="grid gap-2 text-sm text-slate-300">
-                              <div className="flex items-center justify-between gap-3">
-                                <span>Owner</span>
-                                <span className="break-all text-right">{activeProject.ownerId}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-3">
-                                <span>Members</span>
-                                <span>{activeProject.members?.length || 0}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-3">
-                                <span>Created</span>
-                                <span>{formatDateTime(activeProject.createdAt)}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <Button variant="secondary" type="button" onClick={() => handleProjectUpdate(activeProject)}>
-                                Edit
-                              </Button>
-                              <Button variant="danger" type="button" onClick={() => handleProjectDelete(activeProject)}>
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="mt-3 text-sm text-slate-400">
-                            Select a project from the sidebar to inspect its details, sprints, and tasks.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
-                          Projects overview
-                        </p>
-                        <div className="mt-3 space-y-2">
-                          {projects.slice(0, 4).map((project) => (
-                            <div
-                              key={project.id}
-                              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-3 py-2"
-                            >
-                              <div>
-                                <p className="font-medium text-white">{project.name}</p>
-                                <p className="text-xs text-slate-400">{project.key}</p>
-                              </div>
-                              <span className="text-xs text-slate-300">{project.members?.length || 0} members</span>
-                            </div>
-                          ))}
-                          {!projects.length ? <p className="text-sm text-slate-400">No projects yet.</p> : null}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard title="Sprint planner" eyebrow="Delivery rhythm">
-                  <div className="space-y-4">
-                    <form className="space-y-4" onSubmit={handleSprintSubmit}>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Sprint name">
-                          <Input
-                            value={sprintForm.name}
-                            onChange={(event) =>
-                              setSprintForm((current) => ({ ...current, name: event.target.value }))
-                            }
-                            placeholder="Sprint 12"
-                            disabled={!selectedProjectId}
-                          />
-                        </Field>
-                        <Field label="Goal">
-                          <Input
-                            value={sprintForm.goal}
-                            onChange={(event) =>
-                              setSprintForm((current) => ({ ...current, goal: event.target.value }))
-                            }
-                            placeholder="Ship onboarding"
-                            disabled={!selectedProjectId}
-                          />
-                        </Field>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Start date">
-                          <Input
-                            type="date"
-                            value={sprintForm.startDate}
-                            onChange={(event) =>
-                              setSprintForm((current) => ({ ...current, startDate: event.target.value }))
-                            }
-                            disabled={!selectedProjectId}
-                          />
-                        </Field>
-                        <Field label="End date">
-                          <Input
-                            type="date"
-                            value={sprintForm.endDate}
-                            onChange={(event) =>
-                              setSprintForm((current) => ({ ...current, endDate: event.target.value }))
-                            }
-                            disabled={!selectedProjectId}
-                          />
-                        </Field>
-                      </div>
-
-                      <Button type="submit" disabled={!selectedProjectId || busy.sprintCreate}>
-                        {busy.sprintCreate ? 'Planning...' : 'Create sprint'}
-                      </Button>
-                    </form>
-
-                    <div className="space-y-3">
-                      {sprints.length ? (
-                        sprints.map((sprint) => (
-                          <div
-                            key={sprint.id}
-                            className="rounded-3xl border border-white/10 bg-white/5 p-4"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <p className="font-display text-xl font-semibold text-white">{sprint.name}</p>
-                                <p className="mt-1 text-sm text-slate-300">{sprint.goal || 'No goal set.'}</p>
-                              </div>
-                              <Badge className={statusTone[sprint.status] || 'border-white/10 bg-white/5 text-slate-200'}>
-                                {sprint.status}
-                              </Badge>
-                            </div>
-
-                            <div className="mt-4 grid gap-2 text-sm text-slate-300">
-                              <div className="flex items-center justify-between gap-3">
-                                <span>Dates</span>
-                                <span>
-                                  {formatDate(sprint.startDate)} - {formatDate(sprint.endDate)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between gap-3">
-                                <span>Tasks</span>
-                                <span>{sprint.taskIds?.length || 0}</span>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {sprint.status !== 'ACTIVE' ? (
-                                <Button variant="secondary" type="button" onClick={() => handleSprintAction(api.startSprint, sprint)}>
-                                  Start
-                                </Button>
-                              ) : null}
-                              {sprint.status !== 'CLOSED' ? (
-                                <Button
-                                  variant="secondary"
-                                  type="button"
-                                  onClick={() => handleSprintAction(api.completeSprint, sprint)}
-                                >
-                                  Complete
-                                </Button>
-                              ) : null}
-                            </div>
-
-                            <form
-                              className="mt-4 space-y-2 rounded-2xl border border-white/10 bg-slate-950/30 p-3"
-                              onSubmit={(event) => handleAddTaskToSprint(event, sprint.id)}
-                            >
-                              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
-                                Add task to sprint
-                              </p>
-                              <div className="flex gap-2">
-                                <Select name="taskId" defaultValue="">
-                                  <option value="">Choose task</option>
-                                  {tasks
-                                    .filter((task) => !task.sprintId || task.sprintId === sprint.id)
-                                    .map((task) => (
-                                      <option key={task.id} value={task.id}>
-                                        {task.title}
-                                      </option>
-                                    ))}
-                                </Select>
-                                <Button type="submit" variant="secondary">
-                                  Add
-                                </Button>
-                              </div>
-                            </form>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
-                          No sprints yet for this project.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </SectionCard>
+                  + Create Task
+                </button>
+                <button
+                  onClick={() => setSprintDrawerOpen(true)}
+                  disabled={!selectedProjectId}
+                  className="rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4.5 py-2.5 text-xs font-bold text-white shadow shadow-indigo-600/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  + Plan Sprint
+                </button>
               </div>
+            </header>
 
-              <SectionCard
-                title="Task board"
-                eyebrow="Delivery surface"
-                action={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Select
-                      value={taskFilter}
-                      onChange={(event) => setTaskFilter(event.target.value)}
-                      className="min-w-[12rem]"
-                    >
-                      <option value="">All statuses</option>
-                      {statusOrder.map((status) => (
-                        <option key={status} value={status}>
-                          {statusLabels[status]}
-                        </option>
-                      ))}
-                    </Select>
-                    {busy.tasks ? <Badge className="border-white/10 bg-white/5 text-slate-200">Refreshing</Badge> : null}
-                  </div>
-                }
-              >
-                <div className="grid gap-4 xl:grid-cols-4">
-                  {statusOrder.map((status) => {
-                    const columnTasks = tasks.filter((task) => task.status === status);
+            {/* Sub-view switcher based on Tab */}
+            <main className="min-h-[500px]">
+              {activeTab === 'dashboard' && (
+                <DashboardView
+                  projects={projects}
+                  sprints={sprints}
+                  tasks={tasks}
+                  activeProject={activeProject}
+                  activeSprints={activeSprints}
+                  taskCounts={taskCounts}
+                  onViewChange={handleDashboardViewChange}
+                />
+              )}
 
-                    return (
-                      <div key={status} className="rounded-[1.75rem] border border-white/10 bg-white/5 p-3">
-                        <div className="flex items-center justify-between gap-3 px-1 pb-3">
-                          <div>
-                            <p className="font-display text-lg font-semibold text-white">
-                              {statusLabels[status]}
-                            </p>
-                            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                              {columnTasks.length} items
-                            </p>
-                          </div>
-                          <Badge className={statusTone[status]}>{status}</Badge>
-                        </div>
+              {activeTab === 'board' && (
+                <BoardView
+                  tasks={tasks}
+                  activeProject={activeProject}
+                  onStatusChange={handleTaskStatusChange}
+                  onDelete={triggerTaskDelete}
+                  onCreateTaskClick={() => setTaskDrawerOpen(true)}
+                />
+              )}
 
-                        <div className="space-y-3">
-                          {columnTasks.length ? (
-                            columnTasks.map((task) => (
-                              <article
-                                key={task.id}
-                                className="rounded-3xl border border-white/10 bg-slate-950/40 p-4 shadow-[0_12px_50px_rgba(0,0,0,0.24)]"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <h3 className="font-semibold text-white">{task.title}</h3>
-                                    <p className="mt-1 text-sm leading-6 text-slate-300">
-                                      {task.description || 'No description.'}
-                                    </p>
-                                  </div>
-                                  <span className={`text-xs font-bold uppercase tracking-[0.2em] ${priorityTone[task.priority] || 'text-slate-300'}`}>
-                                    {task.priority}
-                                  </span>
-                                </div>
+              {activeTab === 'sprints' && (
+                <SprintsView
+                  sprints={sprints}
+                  tasks={tasks}
+                  activeProject={activeProject}
+                  onCreateSprintClick={() => setSprintDrawerOpen(true)}
+                  handleSprintAction={handleSprintAction}
+                  handleAddTaskToSprint={handleAddTaskToSprint}
+                />
+              )}
 
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {task.labels?.map((label) => (
-                                    <Badge key={label} className="border-white/10 bg-white/5 text-slate-200">
-                                      {label}
-                                    </Badge>
-                                  ))}
-                                </div>
-
-                                <div className="mt-4 grid gap-2 text-xs text-slate-400">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>Assignee</span>
-                                    <span className="break-all text-right text-slate-200">
-                                      {task.assignee || 'Unassigned'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>Reporter</span>
-                                    <span className="break-all text-right text-slate-200">
-                                      {task.reporter || 'Unknown'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>Comments</span>
-                                    <span>{task.comments?.length || 0}</span>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>Attachments</span>
-                                    <span>{task.attachments?.length || 0}</span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 space-y-2">
-                                  <Field label="Move status">
-                                    <Select
-                                      value={task.status}
-                                      onChange={(event) => handleTaskStatusChange(task, event.target.value)}
-                                    >
-                                      {statusOrder.map((option) => (
-                                        <option key={option} value={option}>
-                                          {statusLabels[option]}
-                                        </option>
-                                      ))}
-                                    </Select>
-                                  </Field>
-
-                                  <div className="flex gap-2">
-                                    <Button
-                                      variant="secondary"
-                                      type="button"
-                                      onClick={() => handleTaskDelete(task)}
-                                      className="flex-1"
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </div>
-                              </article>
-                            ))
-                          ) : (
-                            <div className="rounded-3xl border border-dashed border-white/10 bg-slate-950/20 p-5 text-sm text-slate-400">
-                              Nothing here yet.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </SectionCard>
-
-              <SectionCard title="Task composer" eyebrow="Create and attach">
-                <form className="grid gap-4 xl:grid-cols-2" onSubmit={handleTaskSubmit}>
-                  <div className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Title">
-                        <Input
-                          value={taskForm.title}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, title: event.target.value }))
-                          }
-                          placeholder="Finalize release notes"
-                          disabled={!selectedProjectId}
-                        />
-                      </Field>
-                      <Field label="Priority">
-                        <Select
-                          value={taskForm.priority}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, priority: event.target.value }))
-                          }
-                          disabled={!selectedProjectId}
-                        >
-                          {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((priority) => (
-                            <option key={priority} value={priority}>
-                              {priority}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                    </div>
-
-                    <Field label="Description">
-                      <TextArea
-                        rows={5}
-                        value={taskForm.description}
-                        onChange={(event) =>
-                          setTaskForm((current) => ({ ...current, description: event.target.value }))
-                        }
-                        placeholder="What needs to be done?"
-                        disabled={!selectedProjectId}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Sprint">
-                        <Select
-                          value={taskForm.sprintId}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, sprintId: event.target.value }))
-                          }
-                          disabled={!selectedProjectId}
-                        >
-                          <option value="">No sprint</option>
-                          {sprints.map((sprint) => (
-                            <option key={sprint.id} value={sprint.id}>
-                              {sprint.name}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label="Assignee">
-                        <Input
-                          value={taskForm.assignee}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, assignee: event.target.value }))
-                          }
-                          placeholder="User identifier"
-                          disabled={!selectedProjectId}
-                        />
-                      </Field>
-                    </div>
-
-                    <Field label="Labels" hint="Comma-separated">
-                      <Input
-                        value={taskForm.labels}
-                        onChange={(event) =>
-                          setTaskForm((current) => ({ ...current, labels: event.target.value }))
-                        }
-                        placeholder="backend, release, urgent"
-                        disabled={!selectedProjectId}
-                      />
-                    </Field>
-
-                    <Button type="submit" disabled={!selectedProjectId || busy.taskCreate}>
-                      {busy.taskCreate ? 'Creating...' : 'Create task'}
-                    </Button>
-                  </div>
-                </form>
-              </SectionCard>
+              {activeTab === 'settings' && (
+                <ProjectSettingsView
+                  activeProject={activeProject}
+                  onUpdateClick={() => triggerProjectUpdate(activeProject)}
+                  onDeleteClick={() => triggerProjectDelete(activeProject)}
+                  onAddMember={handleAddProjectMember}
+                  projectMemberId={projectMemberId}
+                  setProjectMemberId={setProjectMemberId}
+                />
+              )}
             </main>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
