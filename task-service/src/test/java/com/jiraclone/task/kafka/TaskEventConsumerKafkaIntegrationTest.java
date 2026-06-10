@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
         TaskEventConsumerKafkaIntegrationTest.KafkaTestConfig.class,
         TaskEventConsumer.class
 })
+
 @EmbeddedKafka(
         partitions = 1,
         topics = {"project.deleted", "sprint.completed"},
