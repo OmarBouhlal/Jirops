@@ -1,7 +1,8 @@
 import { loadSession, saveSession } from './storage';
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-const API_BASE_URL = rawBaseUrl.replace(/\/$/, '');
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+const isBareLocalhostRoot = /^https?:\/\/(localhost|127\.0\.0\.1)\/?$/i.test(rawBaseUrl);
+const API_BASE_URL = rawBaseUrl && !isBareLocalhostRoot ? rawBaseUrl.replace(/\/$/, '') : '';
 
 async function parseResponse(response) {
   const contentType = response.headers.get('content-type') || '';
