@@ -54,7 +54,6 @@ class AuthServiceTest {
         authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenProvider);
         ReflectionTestUtils.setField(authService, "accessTokenExpiryMs", 3_600_000L);
         ReflectionTestUtils.setField(authService, "refreshTokenExpiryMs", 7_200_000L);
-        when(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh-token");
     }
 
     @Test
@@ -69,6 +68,8 @@ class AuthServiceTest {
         });
         when(jwtTokenProvider.generateAccessToken("11111111-1111-1111-1111-111111111111", List.of("ROLE_USER")))
                 .thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken("11111111-1111-1111-1111-111111111111"))
+                .thenReturn("refresh-token");
 
         AuthResponse response = authService.register(new RegisterRequest("user@example.com", "secret"));
 
@@ -102,6 +103,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "$2a$10$hash")).thenReturn(true);
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.login(new LoginRequest("user@example.com", "secret"));
 
@@ -148,6 +150,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByTokenAndRevokedFalse("refresh-token")).thenReturn(Optional.of(refreshToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("new-access");
+        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.refresh(new RefreshRequest("refresh-token"));
 
@@ -202,6 +205,7 @@ class AuthServiceTest {
         // Refresh tokens are opaque and only validated against the DB.
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of("ROLE_USER"))).thenReturn("new-access");
+        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.refresh(new RefreshRequest("refresh-token"));
 
@@ -311,6 +315,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "$2a$10$hash")).thenReturn(true);
         when(jwtTokenProvider.generateAccessToken(userId.toString(), List.of())).thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken(userId.toString())).thenReturn("refresh-token");
 
         AuthResponse response = authService.login(new LoginRequest("user@example.com", "secret"));
 
